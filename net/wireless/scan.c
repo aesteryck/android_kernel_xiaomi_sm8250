@@ -666,10 +666,17 @@ cfg80211_find_elem_match(u8 eid, const u8 *ies, unsigned int len,
 {
 	const struct element *elem;
 
+	/* match_offset can't be smaller than 2, unless match_len is
+	 * zero, in which case match_offset must be zero as well.
+	 */
+	if (WARN_ON((match_len && match_offset < 2) ||
+		    (!match_len && match_offset)))
+		return NULL;
+
 	for_each_element_id(elem, eid, ies, len) {
-		if (elem->datalen >= match_offset + match_len &&
-		    !memcmp(elem->data + match_offset, match, match_len))
-			return elem;
+		if (elem->datalen >= match_offset - 2 + match_len &&
+		    !memcmp(elem->data + match_offset - 2, match, match_len))
+			return (void *)elem;
 	}
 
 	return NULL;
