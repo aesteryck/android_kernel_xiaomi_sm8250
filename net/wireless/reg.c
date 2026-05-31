@@ -3936,6 +3936,7 @@ static void cfg80211_check_and_end_cac(struct cfg80211_registered_device *rdev)
 			rdev_end_cac(rdev, wdev->netdev);
 	}
 }
+EXPORT_SYMBOL(regulatory_pre_cac_allowed);
 
 void regulatory_propagate_dfs_state(struct wiphy *wiphy,
 				    struct cfg80211_chan_def *chandef,
