@@ -5,11 +5,15 @@
  * Register definitions taken from original Realtek rtl8723au driver
  */
 
-#include <asm/byteorder.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/bitfield.h>
+#include <linux/byteorder/generic.h>
 #include <linux/average.h>
-#include <linux/version.h>
+#include <linux/slab.h>
+#include <linux/spinlock.h>
 #include <linux/usb.h>
+#include <linux/etherdevice.h>
 #include <net/mac80211.h>
 
 #define RTL8XXXU_DEBUG_REG_WRITE	0x01
