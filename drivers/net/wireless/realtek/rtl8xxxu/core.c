@@ -5424,7 +5424,7 @@ static void rtl8xxxu_rx_parse_phystats(struct rtl8xxxu_priv *priv,
 		bool parse_cfo = priv->fops->set_crystal_cap &&
 				 priv->vif &&
 				 priv->vif->type == NL80211_IFTYPE_STATION &&
-				 priv->vif->cfg.assoc &&
+				 priv->vif->bss_conf.assoc &&
 				 !crc_icv_err &&
 				 !ieee80211_is_ctl(hdr->frame_control) &&
 				 ether_addr_equal(priv->vif->bss_conf.bssid, hdr->addr2);
@@ -6605,7 +6605,7 @@ static void rtl8xxxu_track_cfo(struct rtl8xxxu_priv *priv)
 	int cfo_khz_a, cfo_khz_b, cfo_average;
 	int crystal_cap;
 	
-	if (!priv->vif || !priv->vif->cfg.assoc) {
+	if (!priv->vif || !priv->vif->bss_conf.assoc) {
 		/* Reset */
 		cfo->adjust = true;
 		
