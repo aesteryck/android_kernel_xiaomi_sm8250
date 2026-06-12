@@ -585,6 +585,9 @@ struct phy_rx_agc_info {
 #endif
 };
 
+#define CCK_AGC_RPT_LNA_IDX_MASK	GENMASK(7, 5)
+#define CCK_AGC_RPT_VGA_IDX_MASK	GENMASK(4, 0)
+
 struct rtl8723au_phy_stats {
 	struct phy_rx_agc_info path_agc[RTL8723A_MAX_RF_PATHS];
 	u8	ch_corr[RTL8723A_MAX_RF_PATHS];
@@ -1531,6 +1534,7 @@ struct rtl8xxxu_tx_urb {
 };
 
 struct rtl8xxxu_fileops {
+	int (*identify_chip) (struct rtl8xxxu_priv *priv);
 	int (*parse_efuse) (struct rtl8xxxu_priv *priv);
 	int (*load_firmware) (struct rtl8xxxu_priv *priv);
 	int (*power_on) (struct rtl8xxxu_priv *priv);
@@ -1546,6 +1550,7 @@ struct rtl8xxxu_fileops {
 	int (*parse_rx_desc) (struct rtl8xxxu_priv *priv, struct sk_buff *skb);
 	void (*init_aggregation) (struct rtl8xxxu_priv *priv);
 	void (*init_statistics) (struct rtl8xxxu_priv *priv);
+	void (*init_burst) (struct rtl8xxxu_priv *priv);
 	void (*enable_rf) (struct rtl8xxxu_priv *priv);
 	void (*disable_rf) (struct rtl8xxxu_priv *priv);
 	void (*usb_quirks) (struct rtl8xxxu_priv *priv);
@@ -1624,6 +1629,10 @@ int rtl8xxxu_init_phy_regs(struct rtl8xxxu_priv *priv,
 int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv, char *fw_name);
 void rtl8xxxu_firmware_self_reset(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_power_off(struct rtl8xxxu_priv *priv);
+void rtl8xxxu_identify_vendor_1bit(struct rtl8xxxu_priv *priv, u32 vendor);
+void rtl8xxxu_identify_vendor_2bits(struct rtl8xxxu_priv *priv, u32 vendor);
+void rtl8xxxu_config_endpoints_sie(struct rtl8xxxu_priv *priv);
+int rtl8xxxu_config_endpoints_no_sie(struct rtl8xxxu_priv *priv);
 int rtl8xxxu_read_efuse8(struct rtl8xxxu_priv *priv, u16 offset, u8 *data);
 void rtl8xxxu_reset_8051(struct rtl8xxxu_priv *priv);
 int rtl8xxxu_auto_llt_table(struct rtl8xxxu_priv *priv);
@@ -1638,6 +1647,8 @@ int rtl8xxxu_init_llt_table(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_gen1_phy_iq_calibrate(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_gen1_init_phy_bb(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_gen1_set_tx_power(struct rtl8xxxu_priv *priv,
+				int channel, bool ht40);
+void rtl8188f_set_tx_power(struct rtl8xxxu_priv *priv,
 				int channel, bool ht40);
 void rtl8xxxu_gen1_config_channel(struct ieee80211_hw *hw);
 void rtl8xxxu_gen2_config_channel(struct ieee80211_hw *hw);
@@ -1655,9 +1666,12 @@ void rtl8xxxu_gen1_init_aggregation(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_gen1_enable_rf(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_gen1_disable_rf(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_gen2_disable_rf(struct rtl8xxxu_priv *priv);
+void rtl8xxxu_init_burst(struct rtl8xxxu_priv *priv);
 int rtl8xxxu_parse_rxdesc16(struct rtl8xxxu_priv *priv, struct sk_buff *skb);
 int rtl8xxxu_parse_rxdesc24(struct rtl8xxxu_priv *priv, struct sk_buff *skb);
 int rtl8xxxu_gen2_channel_to_group(int channel);
+bool rtl8xxxu_simularity_compare(struct rtl8xxxu_priv *priv,
+					  int result[][8], int c1, int c2);
 bool rtl8xxxu_gen2_simularity_compare(struct rtl8xxxu_priv *priv,
 				      int result[][8], int c1, int c2);
 void rtl8xxxu_fill_txdesc_v1(struct ieee80211_hw *hw, struct ieee80211_hdr *hdr,
@@ -1679,6 +1693,7 @@ void rtl8723bu_set_ps_tdma(struct rtl8xxxu_priv *priv,
 				 u8 arg1, u8 arg2, u8 arg3, u8 arg4, u8 arg5);
 void rtl8723bu_phy_init_antenna_selection(struct rtl8xxxu_priv *priv);
 void rtl8723a_set_crystal_cap(struct rtl8xxxu_priv *priv, u8 crystal_cap);
+void rtl8188f_set_crystal_cap(struct rtl8xxxu_priv *priv, u8 crystal_cap);
 s8 rtl8723a_cck_rssi(struct rtl8xxxu_priv *priv, u8 cck_agc_rpt);
 
 extern struct rtl8xxxu_fileops rtl8188fu_fops;

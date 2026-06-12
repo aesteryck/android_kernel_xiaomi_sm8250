@@ -305,7 +305,37 @@ static struct rtl8xxxu_rfregval rtl8188fu_cut_b_radioa_init_table[] = {
 	{0xff, 0xffffffff}
 };
 
-static void rtl8xxxu_8188f_channel_to_group(int channel, int *group, int *cck_group)
+static int rtl8188fu_identify_chip(struct rtl8xxxu_priv *priv)
+{
+	struct device *dev = &priv->udev->dev;
+	u32 sys_cfg, vendor;
+	int ret = 0;
+
+	strscpy(priv->chip_name, "8188FU", sizeof(priv->chip_name));
+	priv->rtl_chip = RTL8188F;
+	priv->rf_paths = 1;
+	priv->rx_paths = 1;
+	priv->tx_paths = 1;
+	priv->has_wifi = 1;
+
+	sys_cfg = rtl8xxxu_read32(priv, REG_SYS_CFG);
+	priv->chip_cut = u32_get_bits(sys_cfg, SYS_CFG_CHIP_VERSION_MASK);
+	if (sys_cfg & SYS_CFG_TRP_VAUX_EN) {
+		dev_info(dev, "Unsupported test chip\n");
+		ret = -ENOTSUPP;
+		goto out;
+	}
+
+	vendor = sys_cfg & SYS_CFG_VENDOR_EXT_MASK;
+	rtl8xxxu_identify_vendor_2bits(priv, vendor);
+
+	ret = rtl8xxxu_config_endpoints_no_sie(priv);
+
+out:
+	return ret;
+}
+
+static void rtl8188f_channel_to_group(int channel, int *group, int *cck_group)
 {
 	if (channel < 3)
 		*group = 0;
@@ -324,14 +354,14 @@ static void rtl8xxxu_8188f_channel_to_group(int channel, int *group, int *cck_gr
 		*cck_group = *group;
 }
 
-static void
+void
 rtl8188f_set_tx_power(struct rtl8xxxu_priv *priv, int channel, bool ht40)
 {
 	u32 val32, ofdm, mcs;
 	u8 cck, ofdmbase, mcsbase;
 	int group, cck_group;
 
-	rtl8xxxu_8188f_channel_to_group(channel, &group, &cck_group);
+	rtl8188f_channel_to_group(channel, &group, &cck_group);
 
 	cck = priv->cck_tx_power_index_A[cck_group];
 
@@ -670,7 +700,6 @@ static void rtl8188fu_init_statistics(struct rtl8xxxu_priv *priv)
 static int rtl8188fu_parse_efuse(struct rtl8xxxu_priv *priv)
 {
 	struct rtl8188fu_efuse *efuse = &priv->efuse_wifi.efuse8188fu;
-	int i;
 
 	if (efuse->rtl_id != cpu_to_le16(0x8129))
 		return -EINVAL;
@@ -691,16 +720,6 @@ static int rtl8188fu_parse_efuse(struct rtl8xxxu_priv *priv)
 
 	dev_info(&priv->udev->dev, "Vendor: %.7s\n", efuse->vendor_name);
 	dev_info(&priv->udev->dev, "Product: %.7s\n", efuse->device_name);
-
-	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_EFUSE) {
-		unsigned char *raw = priv->efuse_wifi.raw;
-
-		dev_info(&priv->udev->dev,
-			 "%s: dumping efuse (0x%02zx bytes):\n",
-			 __func__, sizeof(struct rtl8188fu_efuse));
-		for (i = 0; i < sizeof(struct rtl8188fu_efuse); i += 8)
-			dev_info(&priv->udev->dev, "%02x: %8ph\n", i, &raw[i]);
-	}
 
 	return 0;
 }
@@ -1616,16 +1635,16 @@ static void rtl8188f_usb_quirks(struct rtl8xxxu_priv *priv)
 #define XTAL1	GENMASK(22, 17)
 #define XTAL0	GENMASK(16, 11)
 
-static void rtl8188f_set_crystal_cap(struct rtl8xxxu_priv *priv, u8 crystal_cap)
+void rtl8188f_set_crystal_cap(struct rtl8xxxu_priv *priv, u8 crystal_cap)
 {
 	struct rtl8xxxu_cfo_tracking *cfo = &priv->cfo_tracking;
 	u32 val32;
-	
+
 	if (crystal_cap == cfo->crystal_cap)
 		return;
-	
+
 	val32 = rtl8xxxu_read32(priv, REG_AFE_XTAL_CTRL);
-	
+
 	dev_dbg(&priv->udev->dev,
 			"%s: Adjusting crystal cap from 0x%x (actually 0x%lx 0x%lx) to 0x%x\n",
 			__func__,
@@ -1633,12 +1652,12 @@ static void rtl8188f_set_crystal_cap(struct rtl8xxxu_priv *priv, u8 crystal_cap)
 		 	FIELD_GET(XTAL1, val32),
 			FIELD_GET(XTAL0, val32),
 			crystal_cap);
-	
+
 	val32 &= ~(XTAL1 | XTAL0);
 	val32 |= FIELD_PREP(XTAL1, crystal_cap) |
 		 FIELD_PREP(XTAL0, crystal_cap);
 	rtl8xxxu_write32(priv, REG_AFE_XTAL_CTRL, val32);
-	
+
 	cfo->crystal_cap = crystal_cap;
 }
 
@@ -1646,10 +1665,10 @@ static s8 rtl8188f_cck_rssi(struct rtl8xxxu_priv *priv, u8 cck_agc_rpt)
 {
 	s8 rx_pwr_all = 0x00;
 	u8 vga_idx, lna_idx;
-	
-	lna_idx = (cck_agc_rpt & 0xE0) >> 5;
-	vga_idx = cck_agc_rpt & 0x1F;
-	
+
+	lna_idx = u8_get_bits(cck_agc_rpt, CCK_AGC_RPT_LNA_IDX_MASK);
+	vga_idx = u8_get_bits(cck_agc_rpt, CCK_AGC_RPT_VGA_IDX_MASK);
+
 	switch (lna_idx) {
 	case 7:
 		if (vga_idx <= 27)
@@ -1669,11 +1688,12 @@ static s8 rtl8188f_cck_rssi(struct rtl8xxxu_priv *priv, u8 cck_agc_rpt)
 	default:
 		break;
 	}
-	
+
 	return rx_pwr_all;
 }
 
 struct rtl8xxxu_fileops rtl8188fu_fops = {
+	.identify_chip = rtl8188fu_identify_chip,
 	.parse_efuse = rtl8188fu_parse_efuse,
 	.load_firmware = rtl8188fu_load_firmware,
 	.power_on = rtl8188fu_power_on,
@@ -1689,6 +1709,7 @@ struct rtl8xxxu_fileops rtl8188fu_fops = {
 	.parse_rx_desc = rtl8xxxu_parse_rxdesc24,
 	.init_aggregation = rtl8188fu_init_aggregation,
 	.init_statistics = rtl8188fu_init_statistics,
+	.init_burst = rtl8xxxu_init_burst,
 	.enable_rf = rtl8188f_enable_rf,
 	.disable_rf = rtl8188f_disable_rf,
 	.usb_quirks = rtl8188f_usb_quirks,
