@@ -15,6 +15,7 @@
 #include <linux/usb.h>
 #include <linux/etherdevice.h>
 #include <net/mac80211.h>
+#include <linux/leds.h>
 
 #define RTL8XXXU_DEBUG_REG_WRITE	0x01
 #define RTL8XXXU_DEBUG_REG_READ		0x02
@@ -1398,6 +1399,8 @@ struct rtl8xxxu_cfo_tracking {
 	u32 packet_count_pre;
 };
 
+#define RTL8XXXU_HW_LED_CONTROL	2
+
 struct rtl8xxxu_priv {
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
@@ -1519,6 +1522,10 @@ struct rtl8xxxu_priv {
 	struct rtl8xxxu_btcoex bt_coex;
 	struct rtl8xxxu_ra_report ra_report;
 	struct rtl8xxxu_cfo_tracking cfo_tracking;
+
+	bool led_registered;
+	char led_name[32];
+	struct led_classdev led_cdev;
 };
 
 struct rtl8xxxu_rx_urb {
@@ -1567,6 +1574,8 @@ struct rtl8xxxu_fileops {
 			     u32 rts_rate);
 	void (*set_crystal_cap) (struct rtl8xxxu_priv *priv, u8 crystal_cap);
 	s8 (*cck_rssi) (struct rtl8xxxu_priv *priv, u8 cck_agc_rpt);
+	int (*led_classdev_brightness_set) (struct led_classdev *led_cdev,
+						enum led_brightness brightness);
 	int writeN_block_size;
 	int rx_agg_buf_size;
 	char tx_desc_size;
