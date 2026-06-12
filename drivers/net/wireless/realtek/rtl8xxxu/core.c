@@ -4125,7 +4125,8 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	fops->set_tx_power(priv, 1, false);
 
 	/* Let the 8051 take control of antenna setting */
-	if (priv->rtl_chip != RTL8192E && priv->rtl_chip != RTL8188F) {
+	if (priv->rtl_chip != RTL8192E && priv->rtl_chip != RTL8188F &&
+		priv->rtl_chip != RTL8192C) {
 		val8 = rtl8xxxu_read8(priv, REG_LEDCFG2);
 		val8 |= LEDCFG2_DPDT_SELECT;
 		rtl8xxxu_write8(priv, REG_LEDCFG2, val8);
